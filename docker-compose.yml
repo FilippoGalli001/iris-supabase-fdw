@@ -8,8 +8,6 @@ services:
     ports:
       - "32773:52773"   # Management Portal + /iris-fdw/v1 gateway
       - "31972:1972"    # SuperServer
-    volumes:
-      - ./:/home/irisowner/dev
     networks:
       - default
       - supabase

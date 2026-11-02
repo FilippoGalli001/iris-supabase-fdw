@@ -69,9 +69,12 @@ jobs:
         run: |
           docker compose up -d --build
           for i in $(seq 1 60); do
-            curl -sf -u fdw_user:fdw_password http://localhost:32773/iris-fdw/v1/ping && break
+            if curl -sf -u fdw_user:fdw_password http://localhost:32773/iris-fdw/v1/ping; then
+              echo; echo "IRIS gateway is up"; exit 0
+            fi
             sleep 5
           done
+          echo "IRIS gateway did not come up"; exit 1
 
       - name: IRIS unit tests
         run: |
@@ -85,6 +88,14 @@ jobs:
             echo "== $f"
             docker exec -i supabase_db_iris-fdw-demo psql -U postgres -v ON_ERROR_STOP=1 < "$f"
           done
+
+      - name: Diagnostics
+        if: failure()
+        run: |
+          docker ps -a
+          cat iris-tests.log || true
+          docker logs iris-fdw 2>&1 | tail -100 || true
+          docker exec iris-fdw cat /usr/irissys/mgr/messages.log 2>/dev/null | tail -50 || true
 
   release:
     name: GitHub release
