@@ -170,7 +170,7 @@ create server iris_server
     fdw_package_url 'https://github.com/FilippoGalli001/iris-supabase-fdw/releases/download/v0.1.0/iris_fdw.wasm',
     fdw_package_name 'fgalli:iris-fdw',
     fdw_package_version '0.1.0',
-    fdw_package_checksum '<sha256 from the release>',
+    fdw_package_checksum 'c39c575db2def2168c927ace03ce4c1923ca6e4c8f1d269b0496300f399c78e5',
     api_url 'https://iris.example.com',
     username 'fdw_user',
     password_id '<vault secret id>'
