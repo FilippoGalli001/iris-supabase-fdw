@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<Export generator="Cache" version="25">
+  <Document name="iris-fdw-gateway.ZPM">
+    <Module>
+      <Name>iris-fdw-gateway</Name>
+      <Version>0.1.0</Version>
+      <Description>SQL-over-HTTP gateway that lets Supabase (Postgres) query InterSystems IRIS through the iris_fdw Wasm foreign data wrapper.</Description>
+      <Keywords>supabase postgres fdw foreign-data-wrapper wasm rest sql</Keywords>
+      <Packaging>module</Packaging>
+      <SourcesRoot>iris/src</SourcesRoot>
+      <Resource Name="FDW.Gateway.PKG"/>
+      <UnitTest Name="/iris/tests" Package="FDW.Gateway.Tests" Phase="test"/>
+      <CSPApplication
+        Url="/iris-fdw/v1"
+        DispatchClass="FDW.Gateway.REST"
+        MatchRoles=":{$dbrole}"
+        PasswordAuthEnabled="1"
+        UnauthenticatedEnabled="0"
+        Recurse="1"
+        UseCookies="2"
+        CookiePath="/iris-fdw/"/>
+    </Module>
+  </Document>
+</Export>

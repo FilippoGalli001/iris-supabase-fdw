@@ -1,0 +1,7 @@
+zn "%SYS"
+do ##class(Security.Users).UnExpireUserPasswords("*")
+zn "USER"
+do $system.OBJ.LoadDir("/home/irisowner/dev/demo/iris/src", "ck", , 1)
+do ##class(Demo.Setup).Run()
+zpm "load /home/irisowner/dev/ -v":1:1
+halt

@@ -1,0 +1,128 @@
+name: CI & Release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*.*.*"]
+  pull_request:
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    name: Build Wasm FDW
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Rust (same toolchain as supabase/wrappers)
+        run: |
+          curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.97.1
+          echo "$HOME/.cargo/bin" >> "$GITHUB_PATH"
+
+      - name: Install wasm targets and cargo-component
+        run: |
+          rustup target add wasm32-unknown-unknown wasm32-wasip1
+          cargo install --locked cargo-component --version 0.21.1
+
+      - name: Unit tests
+        working-directory: fdw
+        run: cargo test --lib
+
+      - name: Build Wasm component
+        working-directory: fdw
+        run: cargo component build --release --target wasm32-unknown-unknown
+
+      - name: Checksum
+        run: |
+          mkdir -p dist
+          cp fdw/target/wasm32-unknown-unknown/release/iris_fdw.wasm dist/
+          cd dist && sha256sum iris_fdw.wasm | tee checksum.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: iris_fdw
+          path: dist/
+
+  e2e:
+    name: End-to-end tests (IRIS + Supabase)
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          name: iris_fdw
+          path: dist/
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Start Supabase
+        working-directory: demo
+        run: npx -y supabase start
+
+      - name: Start IRIS (gateway + demo data)
+        run: |
+          docker compose up -d --build
+          for i in $(seq 1 60); do
+            curl -sf -u fdw_user:fdw_password http://localhost:32773/iris-fdw/v1/ping && break
+            sleep 5
+          done
+
+      - name: IRIS unit tests
+        run: |
+          printf 'zpm "iris-fdw-gateway test -only"\nhalt\n' | docker exec -i iris-fdw iris session IRIS -U USER | tee iris-tests.log
+          grep -q "All PASSED" iris-tests.log
+
+      - name: Load the FDW and run the demo + e2e SQL
+        run: |
+          ./scripts/load-wasm.sh
+          for f in demo/sql/01_setup.sql demo/sql/02_tables.sql demo/sql/03_patient_portal.sql tests/e2e.sql; do
+            echo "== $f"
+            docker exec -i supabase_db_iris-fdw-demo psql -U postgres -v ON_ERROR_STOP=1 < "$f"
+          done
+
+  release:
+    name: GitHub release
+    needs: [build, e2e]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: iris_fdw
+          path: dist/
+
+      - name: Create or update the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          VERSION="${GITHUB_REF_NAME#v}"
+          CHECKSUM=$(cut -d' ' -f1 dist/checksum.txt)
+          {
+            echo '```sql'
+            echo "create server iris_server"
+            echo "  foreign data wrapper wasm_wrapper  -- handler extensions.wasm_fdw_handler, see README"
+            echo "  options ("
+            echo "    fdw_package_url 'https://github.com/${GITHUB_REPOSITORY}/releases/download/${GITHUB_REF_NAME}/iris_fdw.wasm',"
+            echo "    fdw_package_name 'fgalli:iris-fdw',"
+            echo "    fdw_package_version '${VERSION}',"
+            echo "    fdw_package_checksum '${CHECKSUM}',"
+            echo "    api_url 'https://<your-iris-host>',"
+            echo "    username '<iris user>',"
+            echo "    password_id '<vault secret id>'"
+            echo "  );"
+            echo '```'
+          } > dist/NOTES.md
+          if gh release view "$GITHUB_REF_NAME" >/dev/null 2>&1; then
+            gh release upload "$GITHUB_REF_NAME" dist/iris_fdw.wasm dist/checksum.txt --clobber
+            gh release edit "$GITHUB_REF_NAME" --notes-file dist/NOTES.md
+          else
+            gh release create "$GITHUB_REF_NAME" dist/iris_fdw.wasm dist/checksum.txt \
+              --title "iris_fdw $GITHUB_REF_NAME" --notes-file dist/NOTES.md
+          fi

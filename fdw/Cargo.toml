@@ -1,0 +1,31 @@
+[package]
+name = "iris_fdw"
+version = "0.1.0"
+edition = "2024"
+rust-version = "1.85"
+description = "Supabase Wasm foreign data wrapper for InterSystems IRIS"
+license = "Apache-2.0"
+
+[lib]
+crate-type = ["cdylib"]
+
+[dependencies]
+wit-bindgen-rt = "0.41.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
+base64 = { version = "0.22", default-features = false, features = ["alloc"] }
+
+[profile.release]
+strip = "debuginfo"
+lto = true
+opt-level = "s"
+
+[package.metadata.component]
+package = "fgalli:iris-fdw"
+
+[package.metadata.component.dependencies]
+
+[package.metadata.component.target]
+path = "wit"
+
+[package.metadata.component.target.dependencies]
+"supabase:wrappers" = { path = "../wit/v2" }

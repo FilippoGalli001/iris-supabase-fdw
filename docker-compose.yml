@@ -1,0 +1,22 @@
+services:
+  iris:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: iris-fdw
+    restart: unless-stopped
+    ports:
+      - "32773:52773"   # Management Portal + /iris-fdw/v1 gateway
+      - "31972:1972"    # SuperServer
+    volumes:
+      - ./:/home/irisowner/dev
+    networks:
+      - default
+      - supabase
+
+networks:
+  # Supabase CLI creates the network "supabase_network_<project_id>"; the demo
+  # project id is "iris-fdw-demo". Joining it lets Postgres reach http://iris-fdw:52773
+  supabase:
+    name: supabase_network_iris-fdw-demo
+    external: true

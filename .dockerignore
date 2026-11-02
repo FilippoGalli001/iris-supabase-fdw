@@ -1,0 +1,10 @@
+.git
+.github
+**/target
+dist
+fdw
+wit
+docker
+scripts
+demo/supabase
+*.wasm
