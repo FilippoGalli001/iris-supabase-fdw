@@ -1,9 +1,13 @@
 # iris-supabase-fdw — InterSystems IRIS wrapper for Supabase
 
+[![CI & Release](https://github.com/FilippoGalli001/iris-supabase-fdw/actions/workflows/release.yml/badge.svg)](https://github.com/FilippoGalli001/iris-supabase-fdw/actions/workflows/release.yml)
+[![Release](https://img.shields.io/github/v/release/FilippoGalli001/iris-supabase-fdw)](https://github.com/FilippoGalli001/iris-supabase-fdw/releases)
+[![License](https://img.shields.io/badge/license-Apache--2.0-blue)](LICENSE)
+
 Query **InterSystems IRIS** tables from **Supabase** as if they were local Postgres tables:
 
 ```sql
-select p.name, a.starts_at, a.doctor
+select p.name, a.startsat, a.doctor
 from iris.appointment a
 join iris.patient p on p.id = a.patient
 where p.city = 'Roma' and a.status = 'scheduled';
@@ -17,6 +21,25 @@ written in Rust, plus a small ObjectScript REST package for IRIS.
 Once IRIS tables are available in Supabase, they work with the rest of the Supabase stack:
 joins with Postgres tables, the auto-generated REST/GraphQL APIs, Auth, Edge Functions and Studio.
 The data stays in IRIS, so nothing is copied or migrated.
+
+## Why this wrapper
+
+IRIS tables behave like Postgres tables. You don't need a hand-written query per table, and
+Postgres doesn't have to download whole tables:
+
+- **You write normal Postgres SQL and IRIS does the work.** `WHERE`, `IN`, `LIKE`, `IS NULL` and
+  `LIMIT` are translated into parameterized IRIS SQL. Rows are streamed page by page, so large
+  tables are not buffered in memory.
+- **The whole surface of a table works.** `IMPORT FOREIGN SCHEMA`, joins with local tables,
+  `INSERT`/`UPDATE`/`DELETE`, and custom IRIS queries (including Vector Search).
+- **It is safe by design.** Results stay correct whatever is pushed down, because every
+  condition is re-checked by Postgres. The SQL privileges of the IRIS user are enforced, and the
+  password is stored in the Supabase Vault.
+- **It is verified end to end.** Every push runs Rust and ObjectScript unit tests, then a
+  regression suite against a real Supabase + IRIS pair. The suite covers paging, pushdown vs local
+  results, writes, `''` vs `NULL`, unicode, vectors and error reporting.
+- **One command starts the demo.** `./scripts/demo.sh` builds the wrapper and starts Supabase
+  and IRIS with demo data.
 
 ## Features
 
