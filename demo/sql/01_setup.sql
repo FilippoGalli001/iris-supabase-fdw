@@ -1,11 +1,17 @@
 -- 1. enable the Wrappers extension and the Wasm FDW handler
 create extension if not exists wrappers with schema extensions;
 
-create foreign data wrapper wasm_wrapper
-  handler extensions.wasm_fdw_handler
-  validator extensions.wasm_fdw_validator;
+do $$ begin
+  if not exists (select 1 from pg_foreign_data_wrapper where fdwname = 'wasm_wrapper') then
+    create foreign data wrapper wasm_wrapper
+      handler extensions.wasm_fdw_handler
+      validator extensions.wasm_fdw_validator;
+  end if;
+end $$;
 
 -- 2. connect to IRIS through the iris-fdw-gateway REST package
+-- (re-running the demo recreates the server and its foreign tables)
+drop server if exists iris_server cascade;
 create server iris_server
   foreign data wrapper wasm_wrapper
   options (

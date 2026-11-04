@@ -13,8 +13,8 @@ join iris.patient p on p.id = a.patient
 where p.city = 'Roma' and a.status = 'scheduled';
 ```
 
-This project implements the Ideas Portal idea **"Add InterSystems wrapper for Supabase"**
-(Community Bounty Program *Idea to Application*, Round 3). It is a
+This project implements the Ideas Portal idea [**"Add InterSystems wrapper for Supabase"** (DPI-I-663)](https://ideas.intersystems.com/ideas/DPI-I-663)
+([Community Bounty Program *Idea to Application*, Round 3](https://community.intersystems.com/post/community-bounty-program-idea-application-%E2%80%94-round-3-live)). It is a
 [Supabase Wasm Foreign Data Wrapper](https://supabase.com/blog/postgres-foreign-data-wrappers-with-wasm)
 written in Rust, plus a small ObjectScript REST package for IRIS.
 
@@ -38,7 +38,7 @@ Postgres doesn't have to download whole tables:
 - **It is verified end to end.** Every push runs Rust and ObjectScript unit tests, then a
   regression suite against a real Supabase + IRIS pair. The suite covers paging, pushdown vs local
   results, writes, `''` vs `NULL`, unicode, vectors and error reporting.
-- **One command starts the demo.** `./scripts/demo.sh` builds the wrapper and starts Supabase
+- **One command starts the demo**, on Windows (`scripts\demo.ps1`) or Bash (`scripts/demo.sh`). It starts Supabase
   and IRIS with demo data.
 
 ## Features
@@ -80,22 +80,46 @@ dates are exchanged in ISO format.
 
 ## Quick start (local demo)
 
-Requirements: Docker, Node.js (for `npx supabase`), Bash (Git Bash on Windows works).
-You don't need a Rust toolchain: the wrapper is compiled inside a Docker container.
+Requirements: **Docker** (Docker Desktop on Windows/macOS, running) and **Node.js** (for `npx supabase`).
+No Rust toolchain or build is needed: the demo downloads the released `iris_fdw.wasm` and verifies its checksum.
+
+**Windows (PowerShell):**
+
+```powershell
+git clone https://github.com/FilippoGalli001/iris-supabase-fdw.git
+cd iris-supabase-fdw
+powershell -ExecutionPolicy Bypass -File scripts\demo.ps1
+```
+
+**macOS / Linux / WSL / Git Bash:**
 
 ```bash
 git clone https://github.com/FilippoGalli001/iris-supabase-fdw.git
 cd iris-supabase-fdw
-./scripts/demo.sh
+./scripts/demo.sh            # add --build to compile the wrapper from source in Docker
 ```
 
+How long it takes: about 2 minutes once the Docker images are on your machine. The very first run
+also downloads the Supabase images and `intersystemsdc/iris-community`, a few GB in total, so it
+depends on your connection. The demo can be re-run at any time.
+
 The script:
-1. builds `dist/iris_fdw.wasm` (Rust → WebAssembly component) and runs the unit tests,
-2. starts Supabase locally (`demo/supabase`),
+1. downloads `dist/iris_fdw.wasm` from the v0.1.0 release and checks its SHA-256 (`--build`
+   compiles it instead: Rust → WebAssembly component, plus the unit tests),
+2. starts Supabase locally (`demo/supabase`, with only the services the demo needs),
 3. builds and starts IRIS (`intersystemsdc/iris-community`). This installs the
    `iris-fdw-gateway` package, creates demo data (`Demo.Patient`, `Demo.Appointment`) and creates
    a least-privilege user `fdw_user`,
-4. loads the wrapper into Postgres and runs `demo/sql/*.sql`.
+4. loads the wrapper into Postgres, runs `demo/sql/*.sql` and prints a first query read from IRIS:
+
+```
+ id |      name       | city
+----+-----------------+------
+  1 | Marco Marino    | Roma
+  8 | Elena Ricci     | Roma
+ 15 | Luca Colombo    | Roma
+...
+```
 
 Then open Supabase Studio at http://127.0.0.1:54323 → SQL editor:
 
@@ -108,7 +132,7 @@ insert into iris.patient (name, birthdate, city) values ('Ada Lovelace', '1815-1
 With `debug 'true'` on the server, every scan prints the SQL sent to IRIS:
 
 ```
-INFO:  iris_fdw: SELECT id, name FROM Demo.Patient WHERE city = ? params=[String("Roma")]
+INFO:  iris_fdw: SELECT "id", "name" FROM Demo.Patient WHERE "city" = ? params=[String("Roma")]
 ```
 
 ### IRIS Vector Search from Supabase
